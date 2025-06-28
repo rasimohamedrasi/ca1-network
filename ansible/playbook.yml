@@ -1,0 +1,52 @@
+- name: Deploy Docker App to EC2 Ubuntu
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Update APT cache
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+          - ca-certificates
+          - curl
+          - gnupg
+          - python3-pip
+
+    - name: Install Docker
+      shell: apt install docker.io -y 
+      become: true
+
+    - name: Ensure Docker service is started and enabled
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create app directory
+      file:
+        path: /home/ubuntu/webapp
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy application files to EC2
+      copy:
+        src: ../webapp/
+        dest: /home/ubuntu/webapp/
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+
+    - name: Build Docker image
+      command: docker build -t webapp /home/ubuntu/webapp
+      args:
+        chdir: /home/ubuntu/webapp
+
+    - name: Run Docker container
+      command: docker run -d --restart unless-stopped --name webapp -p 80:80 webapp
